@@ -55,6 +55,7 @@ def test_read_user(client):
         'id': 1,
     }
 
+
 def test_read_user_not_found_user(client):
     response = client.get(
         '/users/-1',
