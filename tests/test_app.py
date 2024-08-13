@@ -83,14 +83,15 @@ def test_read_user_not_found_user(client):
     assert response.status_code == HTTPStatus.NOT_FOUND  # Assert (Afirmação)
 
 
-def test_update_user(client, user):
+def test_update_user(client, user, token):
     user_schema = UserSchema.model_validate(user).model_dump()
     user_schema['username'] = 'nome_diferente'
 
     user_response = UserPublic.model_validate(user).model_dump()
     user_response['username'] = 'nome_diferente'
     response = client.put(
-        '/users/1',
+        f'/users/{user.id}',
+        headers={'Authorization': f'Bearer {token}'},
         json=user_schema,
     )  # Act (Ação)
 
@@ -98,28 +99,44 @@ def test_update_user(client, user):
     assert response.json() == user_response
 
 
-def test_update_not_found_user(client, user):
+def test_update_wrong_user_id(client, user, token):
     user_schema = UserSchema.model_validate(user).model_dump()
     response = client.put(
         '/users/-1',
+        headers={'Authorization': f'Bearer {token}'},
         json=user_schema,
     )  # Act (Ação)
 
-    assert response.status_code == HTTPStatus.NOT_FOUND  # Assert (Afirmação)
+    assert response.status_code == HTTPStatus.FORBIDDEN  # Assert (Afirmação)
 
 
-def test_delete_user(client, user):
+def test_delete_user(client, user, token):
     response = client.delete(
-        '/users/1',
+        f'/users/{user.id}',
+        headers={'Authorization': f'Bearer {token}'},
     )  # Act (Ação)
 
     assert response.status_code == HTTPStatus.OK  # Assert (Afirmação)
     assert response.json() == {'message': 'User with id 1 deleted!'}
 
 
-def test_delete_not_found_user(client):
+def test_delete_wrong_user_id(client, token):
     response = client.delete(
         '/users/-1',
+        headers={'Authorization': f'Bearer {token}'},
     )  # Act (Ação)
 
-    assert response.status_code == HTTPStatus.NOT_FOUND  # Assert (Afirmação)
+    assert response.status_code == HTTPStatus.FORBIDDEN  # Assert (Afirmação)
+
+
+def test_get_token(client, user):
+    response = client.post(
+        '/token',
+        data={'username': user.email, 'password': user.password},
+    )  # Act (Ação)
+
+    token = response.json()
+
+    assert response.status_code == HTTPStatus.OK  # Assert (Afirmação)
+    assert token['token_type'] == 'Bearer'  # Assert (Afirmação)
+    assert 'access_token' in token  # Assert (Afirmação)
