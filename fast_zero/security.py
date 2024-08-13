@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 from http import HTTPStatus
+from typing import Annotated
 
 from fastapi import Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
@@ -12,13 +13,12 @@ from zoneinfo import ZoneInfo
 
 from fast_zero.database import get_session
 from fast_zero.models import User
-
-SECRET_KEY = 'your-secret-key'
-ALGORITHM = 'HS256'
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+from fast_zero.settings import Settings
 
 pwd_context = PasswordHash.recommended()
-oauth2_schema = OAuth2PasswordBearer(tokenUrl='token')
+oauth2_schema = OAuth2PasswordBearer(tokenUrl='auth/token')
+settings = Settings()
+T_Session = Annotated[Session, Depends(get_session)]
 
 
 def get_password_hash(password: str):
@@ -33,17 +33,19 @@ def create_access_token(data: dict):
     to_encode = data.copy()
 
     expire = datetime.now(tz=ZoneInfo('UTC')) + timedelta(
-        minutes=ACCESS_TOKEN_EXPIRE_MINUTES
+        minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
     )
 
     to_encode.update({'exp': expire})
 
-    encode_jwt = encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    encode_jwt = encode(
+        to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM
+    )
     return encode_jwt
 
 
 def get_current_user(
-    session: Session = Depends(get_session),
+    session: T_Session,
     token: str = Depends(oauth2_schema),
 ):
     credentials_exception = HTTPException(
@@ -53,7 +55,9 @@ def get_current_user(
     )
 
     try:
-        payload = decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = decode(
+            token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+        )
         username: str = payload.get('sub')
 
         if not username:
